@@ -3,4 +3,4 @@ Source codes for the paper "ENHANCING SEISMIC NOISE SUPPRESSION USING THE NOISE2
 
 doi: DOI: 10.22541/essoar.170758202.27264292/v1
 
-The SEG-Y data used in this repository can be downloaded from　
+The SEG-Y data used in this repository can be downloaded from　...
