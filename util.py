@@ -21,7 +21,23 @@ from numba import jit
 from scipy import signal
 
 def load_seismic_data(segy_file_path, ffid_byte = 21, trcnum_within_filedrec_byte = 25):
-    """Load seismic traces and attributes from a SEGY file."""
+    """
+    Load seismic traces and attributes from a SEGY file.
+
+    Args:
+        segy_file_path (str): Path to the SEGY file to be loaded.
+        ffid_byte (int, optional): Byte location for the Field File ID. Defaults to 21.
+        trcnum_within_filedrec_byte (int, optional): Byte location for the trace number within the field record. Defaults to 25.
+
+    Returns:
+        tuple: A tuple containing two elements:
+            - numpy.ndarray: An array of normalized seismic traces as float32.
+            - dict: Attributes of the seismic data including 'ffid' (Field File ID), 
+                    'trcnum_within_filedrec' (trace number within the field record), and 'dt' (sample interval).
+
+    Note:
+        The function normalizes seismic traces and extracts specific attributes from the SEGY file, with options to specify byte locations for 'ffid' and 'trcnum_within_filedrec'. The sample interval 'dt' is calculated as the difference between the first two samples.
+    """
     with segyio.open(segy_file_path, ignore_geometry=True, endian='little') as f:
         traces = np.array([normalization(x) for x in f.trace]).astype(np.float32)
         attributes = {
@@ -32,6 +48,18 @@ def load_seismic_data(segy_file_path, ffid_byte = 21, trcnum_within_filedrec_byt
     return traces, attributes
 
 def save_sgy(name, data, spec, header):
+    """
+    Saves seismic data to a SEG-Y file.
+
+    Args:
+        name (str): The name of the output SEG-Y file.
+        data (numpy.ndarray): The seismic data array to be saved.
+        spec (segyio.spec): The specification for the SEG-Y file, defining its layout.
+        header (dict): Headers to be associated with each trace in the SEG-Y file.
+
+    This function creates a SEG-Y file with the specified name and specifications, writes the provided seismic data into it,
+    and assigns the provided header information to each trace. 
+    """
     zn=data.shape[-1]
 
     with segyio.create(name, spec) as f:
@@ -165,7 +193,20 @@ def Instantaneous_scaling(data, gatel, desired_rms=1):
     
     return scaled_data, gate_func
 
-def substack_dataload(data, substack_n, sweep_n, batchsize):     
+def substack_dataload(data, substack_n, batchsize):
+    """
+    Loads a substack of data for processing.
+
+    Args:
+        data (numpy.ndarray): The full dataset from which substacks will be sampled.
+        substack_n (int): The number of sweep to include in each substack.
+        batchsize (int): The number of samples to include in each batch.
+
+    Returns:
+        tuple: A tuple containing two numpy arrays, `x_data` and `t_data`. Each array represents a batch of substacked data. 
+               `x_data` is derived from randomly selected substack indices, and `t_data` is derived from the remaining data after 
+               `x_data` extraction, with both having their means calculated along the axis=1.
+    """
     batch_ind = random.sample(range(data.shape[0]), batchsize)
     batch=data[batch_ind]
 
