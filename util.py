@@ -3,7 +3,7 @@
 """
 Created on Thu Sep 14 13:28:31 2023
 
-@author: aiuser4
+@author: Mitsuyuki.Ozawa (mitsuyuki.ozawa@jgi.co.jp)
 """
 
 import random
@@ -224,6 +224,19 @@ def substack_dataload(data, substack_n, batchsize):
 
 
 def train(dataloader, model, optimizer, loss_fn, device):
+    """
+    Trains a model over a single epoch.
+
+    Args:
+        dataloader (DataLoader): The DataLoader providing the dataset for training.
+        model (torch.nn.Module): The model to be trained.
+        optimizer (torch.optim.Optimizer): The optimizer to use for training.
+        loss_fn (callable): The loss function to use for training.
+        device (torch.device): The device on which to train the model.
+
+    Trains the model using the provided dataloader, model, optimizer, and loss function, 
+    automatically adjusting gradients with mixed precision.
+    """
     num_batches = len(dataloader)
     size = len(dataloader.dataset)
     train_loss = 0
@@ -253,6 +266,19 @@ def train(dataloader, model, optimizer, loss_fn, device):
     print(f"Train Error: {train_loss:>5f}\n")
             
 def valid(data_loader, model, loss_fn,  device):
+    """
+    Validates the model using a validation dataset.
+
+    Args:
+        data_loader (DataLoader): The DataLoader providing the dataset for validation.
+        model (torch.nn.Module): The model to be validated.
+        loss_fn (callable): The loss function used for validation.
+        device (torch.device): The device on which the model and data are located.
+
+    Returns:
+        float: The average validation loss over all batches in the validation dataset.
+    """
+    
     num_batches = len(data_loader)
     model.eval()
     valid_loss= 0
@@ -277,6 +303,17 @@ def valid(data_loader, model, loss_fn,  device):
     return valid_loss
 
 class S2RS_Dataset(Dataset):
+    """
+    A dataset class with optional flipping augmentation.
+
+    Args:
+        x (numpy.ndarray): Input data).
+        y (numpy.ndarray): Target data).
+        flip (bool, optional): Whether to randomly flip the data along the second axis as augmentation. Defaults to False.
+
+    This dataset class supports indexing and length querying. If flipping is enabled, each sample (both `x` and `y`) has a 50% chance
+    of being flipped along its second axis when retrieved.
+    """
     def __init__(self, x, y, flip=False):
         self.xs = x.copy()
         self.ys = y.copy()
@@ -297,6 +334,13 @@ class S2RS_Dataset(Dataset):
         return xs, ys
     
 class SingleConv(nn.Module):
+    """
+    A single convolutional block module for neural networks.
+    Args:
+        in_channels (int): Number of channels in the input image.
+        out_channels (int): Number of channels produced by the convolution.
+        drop (float, optional): Dropout probability. Defaults to 0.1.
+    """
     def __init__(self, in_channels, out_channels, drop=0.1):
         super().__init__()
         self.conv = nn.Sequential(
@@ -310,6 +354,13 @@ class SingleConv(nn.Module):
         return self.conv(x)
 
 class SingleDownConv(nn.Module):
+    """
+    A convolutional block with downsampling.
+    Args:
+        in_channels (int): Number of channels in the input tensor.
+        out_channels (int): Number of channels produced by the convolution.
+        drop (float, optional): Dropout probability. Defaults to 0 for no dropout.
+    """
     def __init__(self, in_channels, out_channels, drop=0):
         super().__init__()
         self.conv = nn.Sequential(
@@ -323,6 +374,16 @@ class SingleDownConv(nn.Module):
         return self.conv(x)
 
 class DoubleConv(nn.Module):
+    """
+    Implements a double convolutional block module.
+
+    Args:
+        in_channels (int): Number of channels in the input tensor.
+        out_channels (int): Number of channels after the first and second convolutions.
+        drop (float, optional): Dropout probability after the first convolutional layer. Defaults to 0 (no dropout).
+
+    The forward pass inputs a tensor and outputs a tensor processed by the two convolutional layers and activations.
+    """
     def __init__(self, in_channels, out_channels, drop=0):
         super().__init__()
         self.conv = nn.Sequential(
@@ -339,6 +400,16 @@ class DoubleConv(nn.Module):
         return self.conv(x)
 
 class UNet(nn.Module):
+    """
+    Implements a U-Net architecture for image segmentation.
+
+    Args:
+        in_channels (int, optional): Number of input channels. Defaults to 1.
+        out_channels (int, optional): Number of output channels. Defaults to 1.
+        features (list of int, optional): Number of features in each layer of the U-Net. Defaults to [32, 64, 128, 256].
+        drop (float, optional): Dropout probability for added regularization. Defaults to 0 (no dropout).
+
+    """
     def __init__(self, in_channels=1, out_channels=1, features=[32, 64, 128, 256], drop=0):
         super().__init__()
 
@@ -358,22 +429,22 @@ class UNet(nn.Module):
             self.decoders.append(DoubleConv(feature*2, feature//2, drop=drop))
         self.pointwise_conv = nn.Conv2d(features[0]//2, out_channels, kernel_size=1)
 
-    def forward(self, x, output_middle=False):
-            inp=x.clone()
-            skip_connections = []
-            for encoder in self.encoders:
-                x = encoder(x)
-                skip_connections.append(x)
-            x = self.bottleneck(x)
-            skip_connections = skip_connections[::-1]
-            for i in range(0, len(self.decoders), 2):
-                skip_connection = skip_connections[i//2]
-                if x.shape != skip_connection.shape:
-                    x = nn.functional.pad(x, [0, skip_connection.shape[3] - x.shape[3], 
-                                              0, skip_connection.shape[2] - x.shape[2]])
-                concat_x = torch.cat((skip_connection, x), dim=1)
-                x = self.decoders[i](concat_x)
-                x = self.decoders[i+1](x)
-            x = self.pointwise_conv(x)
-            return x
+    def forward(self, x):
+        inp=x.clone()
+        skip_connections = []
+        for encoder in self.encoders:
+            x = encoder(x)
+            skip_connections.append(x)
+        x = self.bottleneck(x)
+        skip_connections = skip_connections[::-1]
+        for i in range(0, len(self.decoders), 2):
+            skip_connection = skip_connections[i//2]
+            if x.shape != skip_connection.shape:
+                x = nn.functional.pad(x, [0, skip_connection.shape[3] - x.shape[3], 
+                                          0, skip_connection.shape[2] - x.shape[2]])
+            concat_x = torch.cat((skip_connection, x), dim=1)
+            x = self.decoders[i](concat_x)
+            x = self.decoders[i+1](x)
+        x = self.pointwise_conv(x)
+        return x
 
