@@ -59,7 +59,7 @@ traces = np.pad(traces, ((0, 0), (0, 0), (7, 8), (6, 7)))
 traces = np.transpose(traces, (1, 0, 2, 3))
 traces = np.expand_dims(traces, 2)
 traces_train, traces_valid = train_test_split(traces, test_size = 0.1, random_state=1)
-x_valid, t_valid = substack_dataload(traces_valid, substack_n, sweep_n, len(traces_valid))
+x_valid, t_valid = substack_dataload(traces_valid, substack_n, len(traces_valid))
 
 model = UNet().to(device)
 optimizer = optim.Adam(model.parameters(), lr = learning_rate)
@@ -75,7 +75,7 @@ if TRAIN:
     
     while True:
         itera+=1
-        x_train, t_train = substack_dataload(traces_train, substack_n, sweep_n, batchsize)
+        x_train, t_train = substack_dataload(traces_train, substack_n,  batchsize)
         if np.random.rand()>0.5: 
             x_data = np.flip(x_train, axis=2).copy()   
             t_data = np.flip(t_train, axis=2).copy()   
